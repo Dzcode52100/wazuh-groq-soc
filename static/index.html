@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wazuh SOC Chatbot — POC MAGI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0D1B2A;
+    color: #E2E8F0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* En-tête */
+  .header {
+    background: linear-gradient(135deg, #065A82 0%, #0A3D62 100%);
+    padding: 14px 20px;
+    border-bottom: 3px solid #00A896;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  .header-icon {
+    width: 38px;
+    height: 38px;
+    background: #00A896;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .header-text h1 {
+    color: white;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .header-text p {
+    color: #94A3B8;
+    font-size: 11px;
+    margin-top: 2px;
+  }
+  .badges {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+  }
+  .badge {
+    background: rgba(0, 168, 150, 0.2);
+    border: 1px solid #00A896;
+    color: #00A896;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge.online {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: #22C55E;
+    color: #22C55E;
+  }
+  .badge.online::before {
+    content: '● ';
+    font-size: 8px;
+  }
+
+  /* Zone de conversation */
+  .chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scroll-behavior: smooth;
+  }
+  .chat::-webkit-scrollbar { width: 6px; }
+  .chat::-webkit-scrollbar-track { background: #0D1B2A; }
+  .chat::-webkit-scrollbar-thumb { background: #065A82; border-radius: 3px; }
+
+  .message {
+    display: flex;
+    flex-direction: column;
+    max-width: 80%;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .message.bot  { align-self: flex-start; }
+  .message.user { align-self: flex-end; }
+
+  .bubble {
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.65;
+    word-wrap: break-word;
+  }
+  .bot .bubble {
+    background: #1E293B;
+    border: 1px solid #2D3748;
+    border-bottom-left-radius: 4px;
+  }
+  .user .bubble {
+    background: linear-gradient(135deg, #065A82 0%, #0A3D62 100%);
+    border: 1px solid #1E6EA0;
+    border-bottom-right-radius: 4px;
+  }
+  .meta {
+    font-size: 10px;
+    color: #64748B;
+    margin-top: 4px;
+    padding: 0 4px;
+  }
+  .message.user .meta { text-align: right; }
+
+  /* Indicateur de frappe */
+  .typing .bubble { display: flex; gap: 4px; align-items: center; padding: 14px 18px; }
+  .dot {
+    width: 7px; height: 7px;
+    background: #00A896;
+    border-radius: 50%;
+    animation: bounce 1.2s infinite;
+  }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+  }
+
+  /* Zone de saisie */
+  .input-area {
+    padding: 14px 20px;
+    background: #1A2535;
+    border-top: 2px solid #2D3748;
+    flex-shrink: 0;
+  }
+
+  /* Boutons de questions rapides */
+  .quick-btns {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .qbtn {
+    background: rgba(6, 90, 130, 0.4);
+    border: 1px solid #065A82;
+    color: #94A3B8;
+    padding: 5px 13px;
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .qbtn:hover {
+    background: #065A82;
+    color: white;
+    border-color: #00A896;
+  }
+
+  /* Champ de saisie */
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  #msgInput {
+    flex: 1;
+    background: #0D1B2A;
+    border: 2px solid #2D3748;
+    color: #E2E8F0;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #msgInput:focus { border-color: #065A82; }
+  #msgInput::placeholder { color: #4A5568; }
+
+  #sendBtn {
+    background: #00A896;
+    border: none;
+    color: white;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  #sendBtn:hover   { background: #00C4B0; }
+  #sendBtn:disabled { background: #2D3748; cursor: not-allowed; }
+
+  /* Info pied de page */
+  .footer-info {
+    font-size: 10px;
+    color: #4A5568;
+    text-align: center;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- EN-TÊTE -->
+<div class="header">
+  <div class="header-icon">🛡️</div>
+  <div class="header-text">
+    <h1>Wazuh SOC Assistant</h1>
+    <p>POC MAGI · WebRDInfo · Llama 3.3 70B via Groq</p>
+  </div>
+  <div class="badges">
+    <span class="badge online">En ligne</span>
+    <span class="badge">Groq AI</span>
+  </div>
+</div>
+
+<!-- CONVERSATION -->
+<div class="chat" id="chatDiv">
+  <div class="message bot">
+    <div class="bubble">
+      🛡️ Bonjour ! Je suis votre assistant SOC intégré au SIEM Wazuh.<br>
+      Posez-moi vos questions en langage naturel sur :<br>
+      • Les alertes de sécurité en cours<br>
+      • L'analyse des menaces détectées<br>
+      • Les actions correctives à prendre
+    </div>
+    <div class="meta">Assistant SOC · Maintenant</div>
+  </div>
+</div>
+
+<!-- SAISIE -->
+<div class="input-area">
+  <div class="quick-btns">
+    <button class="qbtn" data-msg="Analyse les dernières alertes Wazuh de niveau élevé">🔍 Alertes récentes</button>
+    <button class="qbtn" data-msg="Résume le trafic Suricata détecté">🌐 Trafic Suricata</button>
+    <button class="qbtn" data-msg="Quel est le résumé de la sécurité de l'infrastructure ?">📊 Résumé sécurité</button>
+    <button class="qbtn" data-msg="Quelles actions correctives recommandes-tu suite aux alertes ?">⚡ Actions correctives</button>
+    <button class="qbtn" data-msg="Y a-t-il des indicateurs de compromission (IOC) dans les alertes ?">🎯 IOC détectés</button>
+  </div>
+  <div class="input-row">
+    <input id="msgInput" type="text" placeholder="Posez votre question de sécurité...">
+    <button id="sendBtn" title="Envoyer">▶</button>
+  </div>
+  <div class="footer-info">POC MAGI · MOHANED Mohamed Ali · AIS Niveau 6 AFPA Pompey</div>
+</div>
+
+<script>
+  var sessionId = Math.random().toString(36).substr(2, 9);
+
+  function obtenirHeure() {
+    return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function ajouterMessage(texte, estUtilisateur) {
+    var chat = document.getElementById('chatDiv');
+    var div = document.createElement('div');
+    div.className = 'message ' + (estUtilisateur ? 'user' : 'bot');
+
+    var bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = texte.replace(/\n/g, '<br>');
+
+    var meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = (estUtilisateur ? 'Vous' : 'Assistant SOC') + ' · ' + obtenirHeure();
+
+    div.appendChild(bubble);
+    div.appendChild(meta);
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    return div;
+  }
+
+  function afficherTyping() {
+    var chat = document.getElementById('chatDiv');
+    var div = document.createElement('div');
+    div.className = 'message bot typing';
+    div.id = 'typing-indicator';
+    div.innerHTML = '<div class="bubble"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function supprimerTyping() {
+    var el = document.getElementById('typing-indicator');
+    if (el) el.parentNode.removeChild(el);
+  }
+
+  function envoyerMessage(messageTexte) {
+    var input = document.getElementById('msgInput');
+    var btn = document.getElementById('sendBtn');
+    var msg = messageTexte || input.value.trim();
+    if (!msg) return;
+
+    input.value = '';
+    btn.disabled = true;
+    ajouterMessage(msg, true);
+    afficherTyping();
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/chat', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.timeout = 30000;
+
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState === 4) {
+        supprimerTyping();
+        if (xhr.status === 200) {
+          try {
+            var data = JSON.parse(xhr.responseText);
+            ajouterMessage(data.response, false);
+          } catch (e) {
+            ajouterMessage('❌ Erreur de parsing de la réponse', false);
+          }
+        } else {
+          ajouterMessage('❌ Erreur serveur (' + xhr.status + '). Vérifiez que le chatbot est actif.', false);
+        }
+        btn.disabled = false;
+        input.focus();
+      }
+    };
+
+    xhr.ontimeout = function () {
+      supprimerTyping();
+      ajouterMessage('⏱️ Délai dépassé. L\'analyse prend trop de temps.', false);
+      btn.disabled = false;
+    };
+
+    xhr.send(JSON.stringify({ message: msg, session_id: sessionId }));
+  }
+
+  // Bouton envoyer
+  document.getElementById('sendBtn').addEventListener('click', function () {
+    envoyerMessage();
+  });
+
+  // Touche Entrée
+  document.getElementById('msgInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      envoyerMessage();
+    }
+  });
+
+  // Boutons de questions rapides
+  document.querySelectorAll('.qbtn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      envoyerMessage(this.getAttribute('data-msg'));
+    });
+  });
+
+  // Focus automatique
+  document.getElementById('msgInput').focus();
+</script>
+</body>
+</html>
