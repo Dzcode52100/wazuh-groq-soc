@@ -1,0 +1,11 @@
+# Dépendances Python — Wazuh Groq SOC Integration
+# Installation : pip3 install -r requirements.txt --break-system-packages
+
+# Client API Groq (Llama 3.3 70B)
+groq>=0.9.0
+
+# Serveur web Flask (chatbot)
+flask>=3.0.0
+
+# Optionnel : serveur WSGI pour production
+# gunicorn>=21.0.0
